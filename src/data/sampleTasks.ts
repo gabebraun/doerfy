@@ -6,6 +6,7 @@ const baseTask: Partial<Task> = {
   createdBy: 'user-789',
   comments: [],
   attachments: [],
+  history: [],
 };
 
 export const queueTasks: Task[] = [
@@ -28,6 +29,11 @@ export const queueTasks: Task[] = [
     icon: 'purple',
     highlighted: true,
     checklistItems: [],
+    history: [{
+      timeStage: 'queue',
+      entryDate: '2025-02-24T07:38:00Z',
+      userId: 'user-456'
+    }],
     createdAt: '2025-02-24T07:38:00Z',
     updatedAt: '2025-03-10T13:51:00Z',
   },
@@ -49,11 +55,17 @@ export const queueTasks: Task[] = [
     alarm: false,
     icon: 'blue',
     checklistItems: [],
+    history: [{
+      timeStage: 'queue',
+      entryDate: '2025-02-24T07:38:00Z',
+      userId: 'user-456'
+    }],
     createdAt: '2025-02-24T07:38:00Z',
     updatedAt: '2025-03-10T13:51:00Z',
   },
 ];
 
+// Update other task arrays with history...
 export const doTasks: Task[] = [
   {
     ...baseTask,
@@ -73,6 +85,11 @@ export const doTasks: Task[] = [
     alarm: false,
     icon: 'purple',
     checklistItems: [],
+    history: [{
+      timeStage: 'do',
+      entryDate: '2025-02-24T07:38:00Z',
+      userId: 'user-456'
+    }],
     createdAt: '2025-02-24T07:38:00Z',
     updatedAt: '2025-03-10T13:51:00Z',
   },
@@ -101,6 +118,11 @@ export const doingTasks: Task[] = [
       { id: 'check-2', text: 'Fire Fox', completed: false },
       { id: 'check-3', text: 'Safari', completed: false },
     ],
+    history: [{
+      timeStage: 'doing',
+      entryDate: '2025-02-24T07:38:00Z',
+      userId: 'user-456'
+    }],
     createdAt: '2025-02-24T07:38:00Z',
     updatedAt: '2025-03-10T13:51:00Z',
     status: '6',
@@ -126,6 +148,11 @@ export const todayTasks: Task[] = [
     alarm: true,
     icon: 'blue',
     checklistItems: [],
+    history: [{
+      timeStage: 'today',
+      entryDate: '2025-02-24T07:38:00Z',
+      userId: 'user-456'
+    }],
     createdAt: '2025-02-24T07:38:00Z',
     updatedAt: '2025-03-10T13:51:00Z',
   },

@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-import { useHotkeys } from 'react-hotkeys-hook';
+import React, { useState, useEffect } from 'react';
 import { 
   DndContext, 
   DragEndEvent, 
@@ -10,53 +9,31 @@ import {
   useSensors,
   closestCenter,
 } from '@dnd-kit/core';
-import {
-  arrayMove,
-  sortableKeyboardCoordinates,
-} from '@dnd-kit/sortable';
+import { arrayMove } from '@dnd-kit/sortable';
 import { TaskColumn } from "../../components/TaskColumn";
 import { PropertySheet } from "../../components/PropertySheet";
-import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
-import { Checkbox } from "../../components/ui/checkbox";
-import { Separator } from "../../components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import {
-  BellIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
-  ClockIcon,
-  FlameIcon,
-  InfoIcon,
-  MoreHorizontalIcon,
-  PlusIcon,
-  SearchIcon,
-  StarIcon,
-  XIcon,
-} from "lucide-react";
 import { Task } from "../../types/task";
-import { queueTasks, doTasks, doingTasks, todayTasks } from "../../data/sampleTasks";
+import { TimeBox, TimeBoxStage } from "../../types/timeBox";
+import { defaultTimeBoxes } from "../../data/timeBoxes";
+import { loadTimeBoxes, saveTimeBoxes, loadTasks, saveTasks } from "../../utils/storage";
+import { updateTaskAging } from "../../utils/taskAging";
+import { updateTaskScheduling } from '../../utils/taskScheduling';
+import { TimeBoxConfig } from "../../components/TimeBoxDialog";
+import { cn } from "../../lib/utils";
+import { Theme } from '../../utils/theme';
+import { createNewTask } from '../../utils/taskUtils';
 
-const validDropTargets = {
-  queue: ['do', 'doing', 'today', 'done'],
-  do: ['queue', 'doing', 'today', 'done'],
-  doing: ['queue', 'do', 'today', 'done'],
-  today: ['queue', 'do', 'doing', 'done'],
-  done: ['queue', 'do', 'doing', 'today'],
-};
+interface PtbTimeBoxProps {
+  theme?: Theme;
+}
 
-export const PtbTimeBox = (): JSX.Element => {
-  const [tasks, setTasks] = useState<Task[]>([
-    ...queueTasks,
-    ...doTasks,
-    ...doingTasks,
-    ...todayTasks,
-  ]);
+export const PtbTimeBox: React.FC<PtbTimeBoxProps> = ({ theme = 'light' }) => {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [timeBoxes, setTimeBoxes] = useState<TimeBox[]>([]);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [activeTimeStage, setActiveTimeStage] = useState<Task['timeStage']>('queue');
+  const [activeTimeStage, setActiveTimeStage] = useState<TimeBoxStage>('queue');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
-  const [dragOverStage, setDragOverStage] = useState<Task['timeStage'] | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -67,76 +44,172 @@ export const PtbTimeBox = (): JSX.Element => {
     })
   );
 
-  useHotkeys('ctrl+shift+a', (e) => {
-    e.preventDefault();
-    const newTask = handleNewTask(activeTimeStage, '');
-    setEditingTaskId(newTask.id);
-  });
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        const storedTimeBoxes = loadTimeBoxes();
+        const storedTasks = await loadTasks();
+
+        setTimeBoxes(storedTimeBoxes || defaultTimeBoxes);
+        setTasks(storedTasks || []);
+      } catch (error) {
+        console.error('Error initializing data:', error);
+        setTasks([]);
+      }
+    };
+
+    initializeData();
+  }, []);
+
+  useEffect(() => {
+    const updateAging = () => {
+      setTasks(prevTasks => {
+        const updatedTasks = updateTaskAging(prevTasks, timeBoxes);
+        saveTasks(updatedTasks);
+        return updatedTasks;
+      });
+    };
+
+    updateAging();
+    const agingInterval = setInterval(updateAging, 1000 * 60 * 60);
+
+    const updateScheduling = () => {
+      setTasks(prevTasks => {
+        const updatedTasks = prevTasks.map(task => updateTaskScheduling(task));
+        saveTasks(updatedTasks);
+        return updatedTasks;
+      });
+    };
+
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const timeUntilMidnight = tomorrow.getTime() - now.getTime();
+
+    const midnightTimeout = setTimeout(() => {
+      updateScheduling();
+      setInterval(updateScheduling, 24 * 60 * 60 * 1000);
+    }, timeUntilMidnight);
+
+    return () => {
+      clearInterval(agingInterval);
+      clearTimeout(midnightTimeout);
+    };
+  }, [timeBoxes]);
 
   const handleTaskSelect = (task: Task) => {
-    setSelectedTask(task);
-    setActiveTimeStage(task.timeStage);
-    setEditingTaskId(null);
+    if (editingTaskId !== task.id) {
+      setSelectedTask(task);
+      setActiveTimeStage(task.timeStage as TimeBoxStage);
+      setEditingTaskId(null);
+    }
   };
 
   const handleTaskUpdate = (updatedTask: Task) => {
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
+    setTasks((prevTasks) => {
+      const newTasks = prevTasks.map((task) =>
         task.id === updatedTask.id ? updatedTask : task
-      )
-    );
+      );
+      saveTasks(newTasks);
+      return newTasks;
+    });
     setSelectedTask(updatedTask);
-    setActiveTimeStage(updatedTask.timeStage);
+    setActiveTimeStage(updatedTask.timeStage as TimeBoxStage);
   };
 
-  const handleNewTask = (timeStage: Task['timeStage'], title: string): Task => {
-    const newTask: Task = {
-      id: `task-${Date.now()}`,
-      title,
-      description: '',
-      timeStage,
-      stageEntryDate: new Date().toISOString(),
-      assignee: 'user-456',
-      list: 'personal',
-      priority: 'medium',
-      energy: 'medium',
-      location: null,
-      story: null,
-      isReoccurring: false,
-      reoccurringPattern: null,
-      dueDate: null,
-      labels: [],
-      alarm: false,
-      icon: 'blue',
-      checklistItems: [],
-      comments: [],
-      attachments: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: 'user-789',
-    };
-
-    setTasks((prevTasks) => [newTask, ...prevTasks]);
-    setSelectedTask(newTask);
-    setActiveTimeStage(timeStage);
-    return newTask;
+  const handleTaskDelete = (taskId: string) => {
+    setTasks((prevTasks) => {
+      const newTasks = prevTasks.filter((task) => task.id !== taskId);
+      saveTasks(newTasks);
+      return newTasks;
+    });
+    if (selectedTask?.id === taskId) {
+      setSelectedTask(null);
+    }
   };
 
-  const handleTaskTitleUpdate = (taskId: string, newTitle: string) => {
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
-        task.id === taskId ? { ...task, title: newTitle } : task
-      )
+  const calculateDaysInStage = (startDate: string, endDate: string): number => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const handleNewTask = async (timeStage: TimeBoxStage, title: string): Promise<Task> => {
+    try {
+      const newTask = await createNewTask('personal', title);
+      newTask.timeStage = timeStage;
+      
+      const updatedTasks = [newTask, ...tasks];
+      await saveTasks(updatedTasks);
+      setTasks(updatedTasks);
+      setSelectedTask(newTask);
+      setActiveTimeStage(timeStage);
+      return newTask;
+    } catch (error) {
+      console.error('Error creating new task:', error);
+      throw error;
+    }
+  };
+
+  const handleTaskTitleUpdate = (taskId: string, title: string) => {
+    if (editingTaskId === taskId) {
+      setTasks((prevTasks) => {
+        const updatedTasks = prevTasks.map((task) =>
+          task.id === taskId ? { ...task, title: title.trim() || task.title } : task
+        );
+        saveTasks(updatedTasks);
+        return updatedTasks;
+      });
+      setEditingTaskId(null);
+    } else {
+      setEditingTaskId(taskId);
+    }
+  };
+
+  const handleTimeBoxEdit = (timeStage: TimeBoxStage, config: TimeBoxConfig) => {
+    const updatedTimeBoxes = timeBoxes.map(tb =>
+      tb.id === timeStage ? { ...tb, ...config } : tb
     );
-    setEditingTaskId(null);
+    setTimeBoxes(updatedTimeBoxes);
+    saveTimeBoxes(updatedTimeBoxes);
   };
 
-  const getTasksByStage = (stage: Task['timeStage']) => {
+  const handleTimeBoxMove = (timeStage: TimeBoxStage, direction: 'up' | 'down') => {
+    const currentIndex = timeBoxes.findIndex(tb => tb.id === timeStage);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= timeBoxes.length) return;
+
+    const updatedTimeBoxes = arrayMove(timeBoxes, currentIndex, newIndex);
+    updatedTimeBoxes.forEach((tb, index) => {
+      tb.order = index;
+    });
+
+    setTimeBoxes(updatedTimeBoxes);
+    saveTimeBoxes(updatedTimeBoxes);
+  };
+
+  const handleAddTimeBox = (config: TimeBoxConfig) => {
+    const newTimeBox: TimeBox = {
+      ...config,
+      order: timeBoxes.length,
+    };
+    const updatedTimeBoxes = [...timeBoxes, newTimeBox];
+    setTimeBoxes(updatedTimeBoxes);
+    saveTimeBoxes(updatedTimeBoxes);
+  };
+
+  const getTasksByStage = (stage: TimeBoxStage) => {
     return tasks.filter(task => task.timeStage === stage);
   };
 
-  const isValidDropTarget = (sourceStage: Task['timeStage'], targetStage: Task['timeStage']) => {
-    return validDropTargets[sourceStage]?.includes(targetStage) ?? false;
+  const validDropTargets = {
+    queue: ['do', 'doing', 'today', 'done'],
+    do: ['queue', 'doing', 'today', 'done'],
+    doing: ['queue', 'do', 'today', 'done'],
+    today: ['queue', 'do', 'doing', 'done'],
+    done: ['queue', 'do', 'doing', 'today'],
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -156,173 +229,108 @@ export const PtbTimeBox = (): JSX.Element => {
     if (!activeTask || !overTask) return;
 
     if (activeTask.timeStage !== overTask.timeStage) {
-      setTasks(prevTasks =>
-        prevTasks.map(task =>
+      const now = new Date().toISOString();
+      const daysInPreviousStage = calculateDaysInStage(
+        activeTask.stageEntryDate,
+        now
+      );
+
+      const updatedHistory = [
+        ...activeTask.history,
+        {
+          timeStage: activeTask.timeStage,
+          entryDate: activeTask.stageEntryDate,
+          daysInStage: daysInPreviousStage,
+          userId: 'user-456'
+        },
+        {
+          timeStage: overTask.timeStage,
+          entryDate: now,
+          userId: 'user-456'
+        }
+      ];
+
+      setTasks((prevTasks) => {
+        const updatedTasks = prevTasks.map(task =>
           task.id === active.id
             ? { 
                 ...task, 
                 timeStage: overTask.timeStage,
-                stageEntryDate: new Date().toISOString(),
-                status: '0' // Reset aging on move
+                stageEntryDate: now,
+                status: undefined,
+                agingStatus: 'normal',
+                history: updatedHistory
               }
             : task
-        )
-      );
+        );
+        saveTasks(updatedTasks);
+        return updatedTasks;
+      });
     } else if (active.id !== over.id) {
       const oldIndex = tasks.findIndex(t => t.id === active.id);
       const newIndex = tasks.findIndex(t => t.id === over.id);
-      setTasks(prevTasks => arrayMove(prevTasks, oldIndex, newIndex));
+      setTasks((prevTasks) => {
+        const updatedTasks = arrayMove(prevTasks, oldIndex, newIndex);
+        saveTasks(updatedTasks);
+        return updatedTasks;
+      });
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = () => {
     setDraggedTask(null);
-    setDragOverStage(null);
   };
 
   return (
-    <div className="bg-white flex flex-row justify-center w-full">
-      <div className="bg-white overflow-x-hidden w-[1921px] h-[1074px]">
-        <div className="relative w-[1922px] h-[1074px] -left-px">
-          <img
-            className="absolute w-[1920px] h-[969px] top-0 left-0"
-            alt="Background"
-            src="/image-454.png"
-          />
-
-          <div className="absolute w-[1179px] h-[827px] top-[130px] left-[55px] bg-white" />
-          <div className="absolute w-[259px] h-[43px] top-[74px] left-[55px] bg-white" />
-          <div className="absolute w-[377px] h-12 top-[72px] left-[53px] bg-white" />
-
-          <div className="absolute w-[466px] h-[42px] top-[11px] left-px bg-white flex items-center">
-            <div className="absolute w-12 h-12 top-0 left-3.5 bg-[url(/ellipse-925.svg)] bg-[100%_100%]">
-              <div className="relative w-[41px] h-[42px] top-1.5 left-[7px]">
-                <img
-                  className="absolute w-[39px] h-[39px] top-[3px] left-0.5"
-                  alt="Intersect"
-                  src="/intersect.svg"
-                />
-                <div className="absolute w-[31px] h-[31px] top-0 left-0 bg-white rounded-[15.5px]" />
-                <img
-                  className="absolute w-5 h-4 top-1.5 left-[5px]"
-                  alt="Vector"
-                  src="/vector-3.svg"
-                />
-                <img
-                  className="absolute w-3.5 h-3.5 top-2 left-[11px]"
-                  alt="Vector"
-                  src="/vector-6.svg"
-                />
-              </div>
-            </div>
-            <div className="absolute top-5 left-[67px] font-semibold text-2xl">
-              <span className="text-black">&nbsp;</span>
-              <span className="text-[#85838e]">DOER</span>
-              <span className="text-[#8f7fcd]">FY</span>
-            </div>
-          </div>
-
-          <div className="absolute w-[54px] h-[901px] top-[65px] left-0 bg-white border border-solid border-[#cccccc] flex flex-col items-center">
-            <div className="mt-4 text-[#808080] text-xl">
-              <SearchIcon />
-            </div>
-            <div className="w-8 h-8 mt-10 bg-[#8f7fcd] rounded flex items-center justify-center text-white text-xl">
-              <ClockIcon />
-            </div>
-            <div className="mt-10 text-[#6f6f6f] text-xl">
-              <ChevronDownIcon />
-            </div>
-            <div className="mt-10 text-[#808080] text-xl">
-              <ChevronRightIcon />
-            </div>
-            <div className="mt-10 text-[#808080] text-xl">
-              <InfoIcon />
-            </div>
-            <div className="mt-10 text-[#808080] text-xl">
-              <SearchIcon />
-            </div>
-            <div className="mt-10 text-[#808080] text-xl">
-              <SearchIcon />
-            </div>
-            <div className="mt-10 text-[#808080] text-xl">
-              <SearchIcon />
-            </div>
-            <div className="mt-10 text-[#808080] text-xl">
-              <SearchIcon />
-            </div>
-          </div>
-
-          <div className="absolute top-[83px] left-[87px] flex items-center">
-            <ClockIcon className="text-[#5036b0] text-2xl" />
-            <span className="ml-4 font-light text-[#6f6f6f] text-2xl">
-              Time Box
-            </span>
-          </div>
-
-          <div className="absolute top-[157px] left-[450px] flex items-center space-x-4">
-            <img
-              className="w-6 h-6 object-cover"
-              alt="Ellipse"
-              src="/ellipse-927.png"
+    <div className="flex flex-1 h-full">
+      <div className="flex-1 px-6 py-4 overflow-auto">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          {timeBoxes.sort((a, b) => a.order - b.order).map((timeBox) => (
+            <TaskColumn
+              key={timeBox.id}
+              title={timeBox.name}
+              count={getTasksByStage(timeBox.id as TimeBoxStage).length}
+              tasks={getTasksByStage(timeBox.id as TimeBoxStage)}
+              badgeCount={getTasksByStage(timeBox.id as TimeBoxStage).length}
+              defaultExpanded={timeBox.id !== 'doing' && timeBox.id !== 'done'}
+              timeStage={timeBox.id as TimeBoxStage}
+              onTaskSelect={handleTaskSelect}
+              onNewTask={handleNewTask}
+              onTaskTitleUpdate={handleTaskTitleUpdate}
+              onTaskDelete={handleTaskDelete}
+              onTimeBoxEdit={handleTimeBoxEdit}
+              onTimeBoxMove={handleTimeBoxMove}
+              editingTaskId={editingTaskId}
+              isActive={activeTimeStage === timeBox.id}
+              canMoveUp={timeBox.order > 0}
+              canMoveDown={timeBox.order < timeBoxes.length - 1}
+              expireThreshold={timeBox.expireThreshold}
             />
-            <Badge className="h-[34px] px-4 bg-[#efefef] text-black rounded flex items-center">
-              <div className="text-[#5036b0] mr-1">●</div>
-              <span className="font-normal text-sm">Work ● Personal</span>
-            </Badge>
-            <Badge className="h-[34px] px-4 bg-[#efefef] text-black rounded flex items-center">
-              <div className="text-red-500 mr-1">
-                <FlameIcon size={16} />
-              </div>
-              <span className="font-normal text-sm text-[#514f4f]">Energy</span>
-            </Badge>
-            <div className="w-4 h-4 bg-[#d9d9d9] rounded-lg ml-4 flex items-center justify-center">
-              <span className="font-normal text-[8px]">+2</span>
-            </div>
-          </div>
-
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="absolute top-[220px] left-[198px] w-[900px]">
-              {(['queue', 'do', 'doing', 'today', 'done'] as const).map((stage) => (
-                <TaskColumn
-                  key={stage}
-                  title={stage === 'queue' ? 'Do Queue' : 
-                         stage === 'do' ? 'Do' :
-                         stage === 'doing' ? 'Doing' :
-                         stage === 'today' ? 'Do Today' : 'Done'}
-                  count={getTasksByStage(stage).length}
-                  tasks={getTasksByStage(stage)}
-                  badgeCount={getTasksByStage(stage).length}
-                  defaultExpanded={stage !== 'doing' && stage !== 'done'}
-                  timeStage={stage}
-                  onTaskSelect={handleTaskSelect}
-                  onNewTask={handleNewTask}
-                  onTaskTitleUpdate={handleTaskTitleUpdate}
-                  editingTaskId={editingTaskId}
-                  isActive={activeTimeStage === stage}
-                  isDraggingOver={dragOverStage === stage}
-                  isValidDropTarget={draggedTask ? isValidDropTarget(draggedTask.timeStage, stage) : true}
-                />
-              ))}
-            </div>
-          </DndContext>
-
-          {selectedTask && (
-            <div className="absolute top-[72px] right-0">
-              <PropertySheet
-                task={selectedTask}
-                onClose={() => setSelectedTask(null)}
-                onTaskUpdate={handleTaskUpdate}
-              />
-            </div>
-          )}
-        </div>
+          ))}
+        </DndContext>
       </div>
+
+      {selectedTask && (
+        <div className={cn(
+          "border-l",
+          theme === 'dark' 
+            ? "border-[#334155] bg-[#1E293B]" 
+            : "border-gray-200"
+        )}>
+          <PropertySheet
+            task={selectedTask}
+            onClose={() => setSelectedTask(null)}
+            onTaskUpdate={handleTaskUpdate}
+            theme={theme}
+          />
+        </div>
+      )}
     </div>
   );
 };

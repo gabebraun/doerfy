@@ -1,39 +1,103 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { format } from 'date-fns';
 import { Task } from '../types/task';
 import { Button } from './ui/button';
-import { Checkbox } from './ui/checkbox';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { EditableProperty } from './EditableProperty';
 import { RichTextEditor } from './RichTextEditor';
+import { TaskHistoryTable } from './TaskHistoryTable';
+import { LabelEditor } from './LabelEditor';
+import { TaskScheduler } from './TaskScheduler';
+import { Label } from './ui/label';
+import { Checkbox } from './ui/checkbox';
+import { cn } from '../lib/utils';
+import { Theme } from '../utils/theme';
+import { supabase } from '../utils/supabaseClient';
 import {
-  BellIcon,
+  CalendarIcon,
   ChevronDownIcon,
   XIcon,
   StarIcon,
   MoreHorizontalIcon,
+  InfoIcon,
+  RepeatIcon,
+  Filter,
+  User
 } from 'lucide-react';
 
 interface PropertySheetProps {
   task: Task;
   onClose: () => void;
   onTaskUpdate: (updatedTask: Task) => void;
+  theme?: Theme;
+  availableLists: string[];
 }
-
-const timeStageOptions = ['queue', 'do', 'doing', 'today', 'done'];
-const priorityOptions = ['High', 'Medium', 'Low'];
-const energyOptions = ['High', 'Medium', 'Low'];
-const listOptions = ['Personal', 'Work', 'Shopping', 'Health'];
 
 export const PropertySheet: React.FC<PropertySheetProps> = ({
   task,
   onClose,
   onTaskUpdate,
+  theme = 'light',
+  availableLists = []
 }) => {
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(() => !task.title.trim());
   const [titleValue, setTitleValue] = useState(task.title);
   const [isHoveringTitle, setIsHoveringTitle] = useState(false);
+  const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const loadAvatar = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('avatar_url')
+          .eq('id', user.id)
+          .single();
+
+        if (profile?.avatar_url) {
+          const { data: { publicUrl } } = supabase
+            .storage
+            .from('avatars')
+            .getPublicUrl(profile.avatar_url);
+          setAvatarUrl(publicUrl);
+        }
+      } catch (error) {
+        console.error('Error loading avatar:', error);
+      }
+    };
+
+    loadAvatar();
+  }, []);
+
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [isEditingTitle]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (titleContainerRef.current && !titleContainerRef.current.contains(event.target as Node)) {
+        handleTitleSave();
+      }
+    };
+
+    if (isEditingTitle) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isEditingTitle, titleValue]);
 
   const handleTaskUpdate = (updates: Partial<Task>) => {
     onTaskUpdate({ ...task, ...updates, updatedAt: new Date().toISOString() });
@@ -44,231 +108,414 @@ export const PropertySheet: React.FC<PropertySheetProps> = ({
   };
 
   const handleTitleSave = () => {
-    if (titleValue.trim() !== task.title) {
-      handleTaskUpdate({ title: titleValue.trim() });
+    const trimmedTitle = titleValue.trim();
+    if (!trimmedTitle) {
+      setTitleValue(task.title || 'New Task');
+      setIsEditingTitle(false);
+      return;
+    }
+    
+    if (trimmedTitle !== task.title) {
+      handleTaskUpdate({ title: trimmedTitle });
     }
     setIsEditingTitle(false);
   };
 
+  const handleTitleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsEditingTitle(true);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') {
+      handleTitleSave();
+    } else if (e.key === 'Escape') {
+      setTitleValue(task.title);
+      setIsEditingTitle(false);
+    }
+  };
+
+  const handleLabelsChange = (newLabels: string[]) => {
+    handleTaskUpdate({ labels: newLabels });
+  };
+
+  const handleScheduleClick = () => {
+    setIsSchedulerOpen(true);
+  };
+
+  const handleScheduleChange = (schedule: Task['schedule']) => {
+    handleTaskUpdate({ schedule });
+  };
+
+  const formatScheduleDetails = () => {
+    if (!task.schedule?.enabled || !task.schedule.date) return '';
+    
+    const date = new Date(task.schedule.date);
+    const formattedDate = format(date, 'MMM d');
+    const leadText = task.schedule.leadDays || task.schedule.leadHours 
+      ? ` (${task.schedule.leadDays}d ${task.schedule.leadHours}h)`
+      : '';
+
+    return `${formattedDate}, ${task.schedule.time}${leadText}`;
+  };
+
   return (
-    <div className="w-[635px] h-full bg-white border border-solid border-[#d9d9d9]">
-      <div className="p-4 flex items-center">
-        <div className="text-[#5036b0] text-2xl mr-4">●</div>
-        <h2 className="font-light text-[#6f6f6f] text-[21px]">About Task</h2>
+    <div className={cn(
+      "w-[635px] h-screen flex flex-col",
+      theme === 'dark' ? 'bg-[#1E293B]' : 'bg-white'
+    )}>
+      <div className={cn(
+        "h-16 flex items-center px-4 border-b",
+        theme === 'dark' ? 'border-[#334155]' : 'border-[#d9d9d9]'
+      )}>
+        <InfoIcon className={theme === 'dark' ? 'text-[#8B5CF6]' : 'text-[#5036b0]'} />
+        <h2 className={cn(
+          "font-light text-xl ml-3",
+          theme === 'dark' ? 'text-slate-300' : 'text-[#6f6f6f]'
+        )}>About Task</h2>
         <div className="flex-grow" />
         <Button
           variant="ghost"
           size="icon"
-          className="text-[#6f6f6f] text-[32px]"
+          className={cn(
+            "w-10 h-10",
+            theme === 'dark' 
+              ? 'text-slate-300 hover:bg-slate-700' 
+              : 'text-[#6f6f6f] hover:bg-gray-100'
+          )}
           onClick={onClose}
         >
-          <XIcon />
+          <XIcon className="w-5 h-5" />
         </Button>
       </div>
 
-      <div className="px-8 py-4">
-        <div className="flex justify-between mb-6">
-          <div className="flex items-center">
-            <Button
-              variant="outline"
-              className="h-9 bg-[#efefef] border-none rounded flex items-center"
-              onClick={() => handleTaskUpdate({ alarm: !task.alarm })}
-            >
-              <BellIcon className="text-[#6f6f6f] text-[21px] mr-2" />
-              <span className="font-normal text-lg">Alarm</span>
-            </Button>
-          </div>
-          <div className="flex items-center">
-            <Button
-              variant="outline"
-              className="h-9 border-[#efefef] rounded flex items-center mr-2"
-            >
-              <StarIcon className="text-yellow-500 text-lg mr-2" />
-              <span className="font-normal text-[#514f4f] text-base">
-                Age {task.status || '0'}
-              </span>
-            </Button>
-            <EditableProperty
-              label=""
-              value={task.timeStage.charAt(0).toUpperCase() + task.timeStage.slice(1)}
-              options={timeStageOptions.map(s => s.charAt(0).toUpperCase() + s.slice(1))}
-              onChange={handleTimeStageChange}
-            />
-            <Button variant="ghost" size="sm" className="ml-2">
-              <MoreHorizontalIcon className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div
-          className={`mb-4 p-2 rounded ${
-            isHoveringTitle ? 'bg-[#f5f5f5]' : ''
-          }`}
-          onMouseEnter={() => setIsHoveringTitle(true)}
-          onMouseLeave={() => setIsHoveringTitle(false)}
-        >
-          {isEditingTitle ? (
-            <input
-              type="text"
-              value={titleValue}
-              onChange={(e) => setTitleValue(e.target.value)}
-              onBlur={handleTitleSave}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleTitleSave();
-                }
-              }}
-              className="text-[21px] font-medium w-full bg-transparent border-none focus:outline-none"
-              autoFocus
-            />
-          ) : (
-            <h1
-              className="text-[21px] font-medium cursor-text"
-              onClick={() => setIsEditingTitle(true)}
-            >
-              {task.title}
-            </h1>
-          )}
-        </div>
-
-        <div className="mb-4">
-          <h3 className="font-bold text-base mb-2">Description</h3>
-          <div className="flex">
-            <RichTextEditor
-              content={task.description}
-              onChange={(content) => handleTaskUpdate({ description: content })}
-            />
-          </div>
-        </div>
-
-        <div className="mb-4">
-          <h3 className="font-medium text-base mb-2">Labels</h3>
-          <div className="flex gap-2">
-            {task.labels.map((label) => (
-              <Badge
-                key={label}
-                className="h-6 bg-[#efefef] text-black rounded-[20px] px-4"
+      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+        <div className="px-8 py-4">
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center gap-4">
+              <Button
+                variant={task.schedule?.enabled ? 'default' : 'ghost'}
+                className={cn(
+                  "h-9 border-none rounded flex items-center text-base gap-2",
+                  task.schedule?.enabled 
+                    ? "bg-[#5036b0] text-white hover:bg-[#3a2783] dark:bg-[#8B5CF6] dark:hover:bg-[#7C3AED]"
+                    : "bg-[#efefef] hover:bg-[#e5e5e5] dark:bg-slate-700 dark:hover:bg-slate-600"
+                )}
+                onClick={handleScheduleClick}
               >
-                {label}
-              </Badge>
-            ))}
+                {task.schedule?.recurring ? (
+                  <RepeatIcon className={cn(
+                    "w-5 h-5",
+                    task.schedule?.enabled 
+                      ? "text-white" 
+                      : theme === 'dark' ? "text-slate-300" : "text-[#6f6f6f]"
+                  )} />
+                ) : (
+                  <CalendarIcon className={cn(
+                    "w-5 h-5",
+                    task.schedule?.enabled 
+                      ? "text-white" 
+                      : theme === 'dark' ? "text-slate-300" : "text-[#6f6f6f]"
+                  )} />
+                )}
+                <span className="font-normal">
+                  {task.schedule?.enabled ? formatScheduleDetails() : 'Schedule'}
+                </span>
+              </Button>
+
+              <Button
+                variant="outline"
+                className={cn(
+                  "h-9 rounded flex items-center gap-2",
+                  theme === 'dark' 
+                    ? "border-slate-600 text-slate-300" 
+                    : "border-[#efefef] text-[#514f4f]"
+                )}
+              >
+                <StarIcon className="text-yellow-500 w-5 h-5" />
+                <span className="font-normal text-base">
+                  Age {task.status || '0'}
+                </span>
+              </Button>
+
+              <EditableProperty
+                label=""
+                value={task.timeStage.charAt(0).toUpperCase() + task.timeStage.slice(1)}
+                options={['Queue', 'Do', 'Doing', 'Today', 'Done']}
+                onChange={handleTimeStageChange}
+                className={cn(
+                  "h-9 rounded text-base",
+                  theme === 'dark' ? "bg-slate-700" : "bg-[#efefef]"
+                )}
+                alwaysShowChevron
+                showFunnelIcon
+              />
+
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="h-9 w-9 p-0"
+              >
+                <MoreHorizontalIcon className={cn(
+                  "h-5 w-5",
+                  theme === 'dark' ? "text-slate-300" : "text-[#6f6f6f]"
+                )} />
+              </Button>
+            </div>
           </div>
-        </div>
 
-        <Separator className="my-6" />
-
-        <Tabs defaultValue="properties">
-          <TabsList className="bg-transparent">
-            <TabsTrigger
-              value="properties"
-              className="bg-[#efefef] text-[#5036b0] data-[state=active]:bg-[#efefef]"
-            >
-              Properties
-            </TabsTrigger>
-            <TabsTrigger
-              value="comments"
-              className="text-[#6f6f6f] data-[state=active]:bg-[#efefef]"
-            >
-              Comments
-            </TabsTrigger>
-            <TabsTrigger
-              value="content"
-              className="text-[#6f6f6f] data-[state=active]:bg-[#efefef]"
-            >
-              Content
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="properties" className="mt-6">
-            <div className="grid grid-cols-2 gap-y-8">
-              <EditableProperty
-                label="Assignee"
-                value="Me"
-                icon={
-                  <img
-                    className="w-6 h-6"
-                    alt="Assignee"
-                    src="/ellipse-927.png"
-                  />
-                }
-                options={['Me', 'Maria Smith', 'John Doe']}
-                onChange={(value) => handleTaskUpdate({ assignee: value })}
+          <div
+            ref={titleContainerRef}
+            className={cn(
+              "mb-4 p-2 rounded",
+              isHoveringTitle && (theme === 'dark' ? "bg-slate-700" : "bg-[#f5f5f5]")
+            )}
+            onMouseEnter={() => setIsHoveringTitle(true)}
+            onMouseLeave={() => setIsHoveringTitle(false)}
+          >
+            {isEditingTitle ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={titleValue}
+                onChange={(e) => setTitleValue(e.target.value)}
+                onKeyDown={handleTitleKeyDown}
+                className={cn(
+                  "text-[21px] font-medium w-full bg-transparent border-none focus:outline-none",
+                  theme === 'dark' ? "text-slate-200" : "text-[#514f4f]"
+                )}
+                onClick={(e) => e.stopPropagation()}
               />
+            ) : (
+              <h1
+                className={cn(
+                  "text-[21px] font-medium cursor-text",
+                  theme === 'dark' ? "text-slate-200" : "text-[#514f4f]"
+                )}
+                onClick={handleTitleClick}
+              >
+                {task.title}
+              </h1>
+            )}
+          </div>
 
-              <EditableProperty
-                label="List"
-                value={task.list}
-                options={listOptions}
-                onChange={(value) => handleTaskUpdate({ list: value })}
+          <div className="mb-4">
+            <h3 className={cn(
+              "font-bold text-base mb-2",
+              theme === 'dark' ? "text-slate-200" : "text-[#514f4f]"
+            )}>Description</h3>
+            <div className="flex">
+              <RichTextEditor
+                content={task.description}
+                onChange={(content) => handleTaskUpdate({ description: content })}
               />
+            </div>
+          </div>
 
-              <EditableProperty
-                label="Priority"
-                value={task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                icon={<div className="text-red-500 text-lg">●</div>}
-                options={priorityOptions}
-                onChange={(value) => 
-                  handleTaskUpdate({ 
-                    priority: value.toLowerCase() as Task['priority']
-                  })
-                }
-              />
+          <div className="mb-4">
+            <LabelEditor
+              labels={task.labels}
+              onChange={handleLabelsChange}
+            />
+          </div>
 
-              <EditableProperty
-                label="Energy"
-                value={task.energy.charAt(0).toUpperCase() + task.energy.slice(1)}
-                icon={<div className="text-yellow-500 text-lg">●</div>}
-                options={energyOptions}
-                onChange={(value) => 
-                  handleTaskUpdate({ 
-                    energy: value.toLowerCase() as Task['energy']
-                  })
-                }
-              />
+          <Separator className={cn(
+            "my-6",
+            theme === 'dark' ? "bg-slate-700" : "bg-[#d9d9d9]"
+          )} />
 
-              <EditableProperty
-                label="Location"
-                value={task.location || 'None'}
-                options={['Home', 'Office', 'Outside']}
-                onChange={(value) => handleTaskUpdate({ location: value })}
-              />
+          <Tabs defaultValue="properties">
+            <TabsList className={cn(
+              "bg-transparent",
+              theme === 'dark' ? "border-slate-700" : "border-[#d9d9d9]"
+            )}>
+              <TabsTrigger
+                value="properties"
+                className={cn(
+                  theme === 'dark'
+                    ? "bg-slate-700 text-[#8B5CF6] data-[state=active]:bg-slate-700"
+                    : "bg-[#efefef] text-[#5036b0] data-[state=active]:bg-[#efefef]"
+                )}
+              >
+                Properties
+              </TabsTrigger>
+              <TabsTrigger
+                value="comments"
+                className={cn(
+                  theme === 'dark'
+                    ? "text-slate-300 data-[state=active]:bg-slate-700"
+                    : "text-[#6f6f6f] data-[state=active]:bg-[#efefef]"
+                )}
+              >
+                Comments
+              </TabsTrigger>
+              <TabsTrigger
+                value="content"
+                className={cn(
+                  theme === 'dark'
+                    ? "text-slate-300 data-[state=active]:bg-slate-700"
+                    : "text-[#6f6f6f] data-[state=active]:bg-[#efefef]"
+                )}
+              >
+                Content
+              </TabsTrigger>
+              <TabsTrigger
+                value="visibility"
+                className={cn(
+                  theme === 'dark'
+                    ? "text-slate-300 data-[state=active]:bg-slate-700"
+                    : "text-[#6f6f6f] data-[state=active]:bg-[#efefef]"
+                )}
+              >
+                Visibility
+              </TabsTrigger>
+              <TabsTrigger
+                value="history"
+                className={cn(
+                  theme === 'dark'
+                    ? "text-slate-300 data-[state=active]:bg-slate-700"
+                    : "text-[#6f6f6f] data-[state=active]:bg-[#efefef]"
+                )}
+              >
+                History
+              </TabsTrigger>
+            </TabsList>
 
-              <EditableProperty
-                label="Story"
-                value={task.story || 'None'}
-                options={['Brazil Vacation', 'Home Renovation', 'Career Goals']}
-                onChange={(value) => handleTaskUpdate({ story: value })}
-              />
+            <TabsContent value="properties" className="mt-6">
+              <div className="grid grid-cols-2 gap-y-8">
+                <EditableProperty
+                  label="Assignee"
+                  value="Me"
+                  icon={
+                    avatarUrl ? (
+                      <img
+                        className="w-6 h-6 rounded-full object-cover"
+                        alt="Assignee"
+                        src={avatarUrl}
+                      />
+                    ) : (
+                      <User className="w-6 h-6" />
+                    )
+                  }
+                  options={['Me', 'Maria Smith', 'John Doe']}
+                  onChange={(value) => handleTaskUpdate({ assignee: value })}
+                />
 
-              <div>
-                <h4 className="font-medium text-base mb-2">Reoccurring</h4>
-                <div className="flex items-center">
-                  <Checkbox
-                    checked={task.isReoccurring}
-                    onCheckedChange={(checked) =>
-                      handleTaskUpdate({ isReoccurring: checked === true })
-                    }
-                    className="rounded-sm border-[#808080]"
-                  />
-                </div>
+                <EditableProperty
+                  label="List"
+                  value={task.list}
+                  options={availableLists}
+                  onChange={(value) => handleTaskUpdate({ list: value })}
+                  disabled={availableLists.length === 0}
+                />
+
+                <EditableProperty
+                  label="Priority"
+                  value={task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                  icon={<div className="text-red-500 text-lg">●</div>}
+                  options={['High', 'Medium', 'Low']}
+                  onChange={(value) => 
+                    handleTaskUpdate({ 
+                      priority: value.toLowerCase() as Task['priority']
+                    })
+                  }
+                />
+
+                <EditableProperty
+                  label="Energy"
+                  value={task.energy.charAt(0).toUpperCase() + task.energy.slice(1)}
+                  icon={<div className="text-yellow-500 text-lg">●</div>}
+                  options={['High', 'Medium', 'Low']}
+                  onChange={(value) => 
+                    handleTaskUpdate({ 
+                      energy: value.toLowerCase() as Task['energy']
+                    })
+                  }
+                />
+
+                <EditableProperty
+                  label="Location"
+                  value={task.location || 'None'}
+                  options={['Home', 'Office', 'Outside']}
+                  onChange={(value) => handleTaskUpdate({ location: value })}
+                />
+
+                <EditableProperty
+                  label="Story"
+                  value={task.story || 'None'}
+                  options={['Brazil Vacation', 'Home Renovation', 'Career Goals']}
+                  onChange={(value) => handleTaskUpdate({ story: value })}
+                />
               </div>
 
-              <EditableProperty
-                label="Due Date"
-                value={task.dueDate || 'None'}
-                options={['Today', 'Tomorrow', 'Next Week']}
-                onChange={(value) => handleTaskUpdate({ dueDate: value })}
-              />
-            </div>
+              <div className={cn(
+                "mt-16 text-base",
+                theme === 'dark' ? "text-slate-400" : "text-[#6f6f6f]"
+              )}>
+                Created {new Date(task.createdAt).toLocaleString()}
+                <br />
+                Updated {new Date(task.updatedAt).toLocaleString()}
+              </div>
+            </TabsContent>
 
-            <div className="mt-16 text-[#6f6f6f] text-base">
-              Created {new Date(task.createdAt).toLocaleString()}
-              <br />
-              Updated {new Date(task.updatedAt).toLocaleString()}
-            </div>
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="visibility" className="mt-6">
+              <div className="grid grid-cols-1 gap-y-4">
+                <div>
+                  <Label className={cn(
+                    "inline-flex items-center space-x-2",
+                    theme === 'dark' ? "text-slate-200" : "text-gray-700"
+                  )}>
+                    <Checkbox
+                      checked={task.showInTimeBox}
+                      onCheckedChange={(checked) => handleTaskUpdate({ showInTimeBox: checked === true })}
+                      className="dark:border-slate-600"
+                    />
+                    <span>Show in Time Box</span>
+                  </Label>
+                </div>
+                <div>
+                  <Label className={cn(
+                    "inline-flex items-center space-x-2",
+                    theme === 'dark' ? "text-slate-200" : "text-gray-700"
+                  )}>
+                    <Checkbox
+                      checked={task.showInList}
+                      onCheckedChange={(checked) => handleTaskUpdate({ showInList: checked === true })}
+                      className="dark:border-slate-600"
+                    />
+                    <span>Show in List</span>
+                  </Label>
+                </div>
+                <div>
+                  <Label className={cn(
+                    "inline-flex items-center space-x-2",
+                    theme === 'dark' ? "text-slate-200" : "text-gray-700"
+                  )}>
+                    <Checkbox
+                      checked={task.showInCalendar}
+                      onCheckedChange={(checked) => handleTaskUpdate({ showInCalendar: checked === true })}
+                      className="dark:border-slate-600"
+                    />
+                    <span>Show in Calendar</span>
+                  </Label>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="history" className="mt-6">
+              <TaskHistoryTable history={task.history} />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
+
+      <TaskScheduler
+        isOpen={isSchedulerOpen}
+        onClose={() => setIsSchedulerOpen(false)}
+        schedule={task.schedule || null}
+        onChange={handleScheduleChange}
+      />
     </div>
   );
 };

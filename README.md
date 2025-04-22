@@ -1,4 +1,4 @@
-# Doerfy Project
+# Anima Project
 
 Welcome to Doerfy
 

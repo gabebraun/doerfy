@@ -1,11 +1,43 @@
+import { TimeBox } from './timeBox';
+
 export type TimeStage = 'queue' | 'do' | 'doing' | 'today' | 'done';
 export type Priority = 'high' | 'medium' | 'low';
 export type Energy = 'high' | 'medium' | 'low';
+export type AgingStatus = 'normal' | 'warning' | 'overdue';
 
 export interface ChecklistItem {
   id: string;
   text: string;
   completed: boolean;
+}
+
+export interface TaskHistoryItem {
+  timeStage: TimeStage;
+  entryDate: string;
+  userId?: string;
+  daysInStage?: number;
+}
+
+export interface TaskSchedule {
+  enabled: boolean;
+  date: Date | null;
+  time: string;
+  leadDays?: number;
+  leadHours?: number;
+  recurring?: {
+    type: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    interval: number;
+    weekDays?: string[];
+    monthDay?: number;
+    monthWeek?: '1st' | '2nd' | '3rd' | '4th' | 'last';
+    monthWeekDay?: string;
+    workdaysOnly?: boolean;
+    ends?: {
+      type: 'date' | 'occurrences' | 'endless';
+      date?: Date;
+      occurrences?: number;
+    };
+  };
 }
 
 export interface Task {
@@ -26,16 +58,20 @@ export interface Task {
   story: string | null;
   
   // Scheduling
-  isReoccurring: boolean;
-  reoccurringPattern: string | null;
-  dueDate: string | null;
+  schedule?: TaskSchedule;
   
   // Metadata
   labels: string[];
-  alarm: boolean;
-  icon: string; // For the colored dot
+  showInTimeBox: boolean;
+  showInList: boolean;
+  showInCalendar: boolean;
+  icon: string;
   highlighted?: boolean;
   status?: string;
+  agingStatus?: AgingStatus;
+  
+  // History tracking
+  history: TaskHistoryItem[];
   
   // System fields
   createdAt: string;
@@ -44,6 +80,33 @@ export interface Task {
   
   // Optional fields
   checklistItems: ChecklistItem[];
-  comments: any[]; // To be defined based on comments feature
-  attachments: any[]; // To be defined based on attachments feature
+  comments: any[];
+  attachments: any[];
+}
+
+export const AGING_THRESHOLDS = {
+  do: {
+    warning: 24,
+    overdue: 30
+  },
+  doing: {
+    warning: 6,
+    overdue: 7
+  },
+  today: {
+    warning: 1,
+    overdue: 1
+  }
+} as const;
+
+export const SCHEDULING_THRESHOLDS = {
+  queue: { min: 30, max: Infinity },
+  do: { min: 8, max: 30 },
+  doing: { min: 2, max: 7 },
+  today: { min: 0, max: 1 }
+} as const;
+
+// Helper function to generate valid UUIDs for tasks
+export function generateTaskId(): string {
+  return crypto.randomUUID();
 }

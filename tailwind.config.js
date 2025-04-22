@@ -4,6 +4,7 @@ module.exports = {
     "app/**/*.{ts,tsx}",
     "components/**/*.{ts,tsx}",
   ],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
@@ -57,6 +58,38 @@ module.exports = {
           '"Noto Color Emoji"',
         ],
       },
+      typography: {
+        DEFAULT: {
+          css: {
+            maxWidth: 'none',
+            color: 'inherit',
+            p: {
+              marginTop: '1em',
+              marginBottom: '1em',
+            },
+            'ul, ol': {
+              paddingLeft: '1.5em',
+              marginTop: '1em',
+              marginBottom: '1em',
+            },
+            li: {
+              marginTop: '0.5em',
+              marginBottom: '0.5em',
+            },
+            strong: {
+              fontWeight: '600',
+              color: 'inherit',
+            },
+            a: {
+              color: '#5036b0',
+              textDecoration: 'underline',
+              '&:hover': {
+                color: '#3a2783',
+              },
+            },
+          },
+        },
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },
@@ -74,6 +107,8 @@ module.exports = {
     },
     container: { center: true, padding: "2rem", screens: { "2xl": "1400px" } },
   },
-  plugins: [],
-  darkMode: ["class"],
+  plugins: [
+    require('tailwind-scrollbar')({ nocompatible: true }),
+    require('@tailwindcss/typography'),
+  ],
 };
