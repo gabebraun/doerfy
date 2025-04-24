@@ -268,6 +268,18 @@ export const TaskColumn: React.FC<TaskColumnProps> = ({
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "t") {
+        e.preventDefault();
+        handleAddNewTask();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const getTaskColor = (icon: string) => {
     switch (icon) {
       case "purple":
