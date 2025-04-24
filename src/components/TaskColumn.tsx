@@ -70,7 +70,7 @@ const DraggableTask: React.FC<DraggableTaskProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [editValue, setEditValue] = useState(task.title);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMenuOpen,setIsMenuOpen] = useState(false);
 
   const {
     attributes,
@@ -120,17 +120,17 @@ const DraggableTask: React.FC<DraggableTaskProps> = ({
       {...attributes}
       {...listeners}
       className={cn(
-        'flex items-start mb-3 last:mb-0 relative p-1 rounded group transition-colors duration-200',
+        'flex items-start mb-3 last:mb-0 relative p-1 rounded group group/options transition-colors duration-200',
         'hover:bg-gray-50 dark:hover:bg-slate-700',
         isDragging && 'opacity-50 cursor-grabbing',
         task.agingStatus === 'warning' && 'bg-yellow-50 dark:bg-yellow-900/20',
         task.agingStatus === 'overdue' && 'bg-red-50 dark:bg-red-900/20'
       )}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => {
-        setIsHovered(false);
-        setIsMenuOpen(false);
-      }}
+      // onMouseEnter={() => setIsHovered(true)}
+      // onMouseLeave={() => {
+      //   setIsHovered(false);
+      //   // setIsMenuOpen(false);
+      // }}
       onMouseDown={handleMouseDown}
       onClick={(e) => {
         if (!isEditing && !isDragging) {
@@ -160,12 +160,12 @@ const DraggableTask: React.FC<DraggableTaskProps> = ({
           >
             {task.title} {task.status && `(${task.status})`}
           </span>
-          {isHovered && !isDragging && (
+          {/* {isHovered && !isDragging && ( */}
             <div className="flex items-center gap-2 ml-2">
               <TaskHoverCard task={task}>
                 <InfoIcon 
                   size={16} 
-                  className="text-gray-400 dark:text-slate-500 cursor-pointer hover:text-gray-600 dark:hover:text-slate-300"
+                  className="text-gray-400 dark:text-slate-500 cursor-pointer hover:text-gray-600 dark:hover:text-slate-300 w-0 opacity-0 group-hover/options:opacity-100 group-hover/options:w-6"
                 />
               </TaskHoverCard>
               <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
@@ -173,7 +173,7 @@ const DraggableTask: React.FC<DraggableTaskProps> = ({
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="h-6 w-6 p-0"
+                    className={`h-6 p-0 ${!isMenuOpen ? "w-0 opacity-0" : "w-6 opacity-100"} group-hover/options:opacity-100 group-hover/options:w-6`}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <MoreHorizontalIcon size={16} className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300" />
@@ -206,7 +206,7 @@ const DraggableTask: React.FC<DraggableTaskProps> = ({
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-          )}
+          {/* )} */}
         </>
       )}
     </div>
