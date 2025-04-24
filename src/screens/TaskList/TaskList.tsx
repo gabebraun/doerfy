@@ -133,11 +133,11 @@ export const TaskList: React.FC<TaskListProps> = ({
       const newTask = await createNewTask(list);
       console.log('New task created:', newTask);
       const updatedTasks = [newTask, ...tasks];
-      // await saveTasks(updatedTasks);
+      await saveTasks(updatedTasks);
       setTasks(updatedTasks);
-      // setNewTaskList(list);
+      setNewTaskList(list);
       setEditingTaskId(newTask.id);
-      // setNewTaskTitle('');
+      setNewTaskTitle('');
       setActiveList(list);
     } catch (error) {
       console.error('Error creating new task:', error);
@@ -236,7 +236,7 @@ export const TaskList: React.FC<TaskListProps> = ({
                   </Button>
                 </div>
                 <div className="space-y-2">
-                  {newTaskList === list && editingTaskId && (
+                  {/* {newTaskList === list && editingTaskId && (
                     <div
                       className={cn(
                         "flex items-start space-x-2 p-2 rounded-lg",
@@ -260,7 +260,7 @@ export const TaskList: React.FC<TaskListProps> = ({
                         className="flex-1"
                       />
                     </div>
-                  )}
+                  )} */}
                   {tasks.map((task) => (
                     <div
                       key={task.id}
