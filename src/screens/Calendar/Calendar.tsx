@@ -1,24 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar as BigCalendar, dateFnsLocalizer, Views } from 'react-big-calendar';
-import { format, parse, startOfWeek, getDay } from 'date-fns';
-import { enUS } from 'date-fns/locale';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { PropertySheet } from '../../components/PropertySheet';
-import { TaskHoverCard } from '../../components/TaskHoverCard';
-import { Task } from '../../types/task';
-import { loadTasks, saveTasks } from '../../utils/storage';
-import { cn } from '../../lib/utils';
-import { Theme } from '../../utils/theme';
-import { Plus } from 'lucide-react';
-import { createNewTask } from '../../utils/taskUtils';
+import React, { useState, useEffect } from "react";
+import {
+  Calendar as BigCalendar,
+  dateFnsLocalizer,
+  Views,
+} from "react-big-calendar";
+import { format, parse, startOfWeek, getDay } from "date-fns";
+import { enUS } from "date-fns/locale";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { PropertySheet } from "../../components/PropertySheet";
+import { TaskHoverCard } from "../../components/TaskHoverCard";
+import { Task } from "../../types/task";
+import { loadTasks, saveTasks } from "../../utils/storage";
+import { cn } from "../../lib/utils";
+import { Theme } from "../../utils/theme";
+import { Plus } from "lucide-react";
+import { createNewTask } from "../../utils/taskUtils";
 
 interface CalendarProps {
   theme?: Theme;
 }
 
 const locales = {
-  'en-US': enUS,
+  "en-US": enUS,
 };
 
 const localizer = dateFnsLocalizer({
@@ -43,7 +47,7 @@ interface NewTaskState {
   title: string;
 }
 
-export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
+export const Calendar: React.FC<CalendarProps> = ({ theme = "light" }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [view, setView] = useState(Views.MONTH);
@@ -52,16 +56,16 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
   const [newTask, setNewTask] = useState<NewTaskState>({
     date: null,
     isEditing: false,
-    title: ''
+    title: "",
   });
 
   useEffect(() => {
     const loadTaskData = async () => {
       try {
         const loadedTasks = await loadTasks();
-        setTasks(loadedTasks.filter(task => task.schedule?.enabled));
+        setTasks(loadedTasks.filter((task) => task.schedule?.enabled));
       } catch (error) {
-        console.error('Error loading tasks:', error);
+        console.error("Error loading tasks:", error);
       }
     };
 
@@ -70,14 +74,14 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
 
   const handleTaskUpdate = async (updatedTask: Task) => {
     try {
-      const updatedTasks = tasks.map(task =>
-        task.id === updatedTask.id ? updatedTask : task
+      const updatedTasks = tasks.map((task) =>
+        task.id === updatedTask.id ? updatedTask : task,
       );
       await saveTasks(updatedTasks);
       setTasks(updatedTasks);
       setSelectedTask(updatedTask);
     } catch (error) {
-      console.error('Error updating task:', error);
+      console.error("Error updating task:", error);
     }
   };
 
@@ -92,13 +96,13 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
         updatedAt: new Date().toISOString(),
       };
 
-      const updatedTasks = tasks.map(task =>
-        task.id === event.task.id ? updatedTask : task
+      const updatedTasks = tasks.map((task) =>
+        task.id === event.task.id ? updatedTask : task,
       );
       await saveTasks(updatedTasks);
       setTasks(updatedTasks);
     } catch (error) {
-      console.error('Error moving task:', error);
+      console.error("Error moving task:", error);
     }
   };
 
@@ -106,7 +110,7 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
     setNewTask({
       date,
       isEditing: true,
-      title: ''
+      title: "",
     });
   };
 
@@ -115,18 +119,18 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
       setNewTask({
         date: null,
         isEditing: false,
-        title: ''
+        title: "",
       });
       return;
     }
 
     try {
-      const task = await createNewTask('personal');
+      const task = await createNewTask("personal");
       task.title = newTask.title.trim();
       task.schedule = {
         enabled: true,
         date: newTask.date,
-        time: '09:00',
+        time: "09:00",
         leadDays: 0,
         leadHours: 0,
       };
@@ -138,16 +142,16 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
       setNewTask({
         date: null,
         isEditing: false,
-        title: ''
+        title: "",
       });
     } catch (error) {
-      console.error('Error creating new task:', error);
+      console.error("Error creating new task:", error);
     }
   };
 
   const events: CalendarEvent[] = tasks
-    .filter(task => task.schedule?.enabled && task.schedule.date)
-    .map(task => ({
+    .filter((task) => task.schedule?.enabled && task.schedule.date)
+    .map((task) => ({
       id: task.id,
       title: task.title,
       start: new Date(task.schedule!.date!),
@@ -160,9 +164,11 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
       <div
         className={cn(
           "truncate px-2 py-1 text-sm rounded cursor-pointer",
-          event.task.priority === 'high' ? 'bg-red-100 dark:bg-red-900/20' :
-          event.task.priority === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/20' :
-          'bg-green-100 dark:bg-green-900/20'
+          event.task.priority === "high"
+            ? "bg-red-100 dark:bg-red-900/20"
+            : event.task.priority === "medium"
+            ? "bg-yellow-100 dark:bg-yellow-900/20"
+            : "bg-green-100 dark:bg-green-900/20",
         )}
       >
         {event.title}
@@ -172,7 +178,7 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
 
   const CustomToolbar = (toolbar: any) => {
     const goToToday = () => {
-      toolbar.onNavigate('TODAY');
+      toolbar.onNavigate("TODAY");
     };
 
     return (
@@ -181,29 +187,27 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => toolbar.onNavigate('PREV')}
+            onClick={() => toolbar.onNavigate("PREV")}
           >
             Previous
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => toolbar.onNavigate('NEXT')}
+            onClick={() => toolbar.onNavigate("NEXT")}
           >
             Next
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={goToToday}
-          >
+          <Button variant="outline" size="sm" onClick={goToToday}>
             Today
           </Button>
         </div>
-        <h2 className={cn(
-          "text-xl font-semibold",
-          theme === 'dark' ? "text-white" : "text-gray-900"
-        )}>
+        <h2
+          className={cn(
+            "text-xl font-semibold",
+            theme === "dark" ? "text-white" : "text-gray-900",
+          )}
+        >
           {toolbar.label}
         </h2>
         <div className="flex items-center space-x-2">
@@ -233,9 +237,17 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
     );
   };
 
-  const DayCell = ({ date, children }: { date: Date; children?: React.ReactNode }) => {
-    const isHovered = hoveredDate && date && hoveredDate.getTime() === date.getTime();
-    const isNewTaskDate = newTask.date && date && newTask.date.getTime() === date.getTime();
+  const DayCell = ({
+    value: date,
+    children,
+  }: {
+    value: Date;
+    children?: React.ReactNode;
+  }) => {
+    const isHovered =
+      hoveredDate && date && hoveredDate.getTime() === date.getTime();
+    const isNewTaskDate =
+      newTask.date && date && newTask.date.getTime() === date.getTime();
 
     return (
       <div
@@ -244,47 +256,52 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
         onMouseLeave={() => setHoveredDate(null)}
       >
         {children}
-        {isHovered && !isNewTaskDate && (
-          <div 
+        {!isNewTaskDate && (
+          <div
             className={cn(
-              "absolute inset-0 flex items-start justify-end p-1",
-              "opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+              "absolute inset-0 top-6 flex items-start justify-end p-1",
+              "transition-opacity duration-200",
+              isHovered ? "opacity-100" : "opacity-0 group-hover:opacity-100",
             )}
           >
-            <div 
+            <div
               className={cn(
                 "w-6 h-6 rounded flex items-center justify-center cursor-pointer",
                 "bg-transparent hover:bg-gray-100 dark:hover:bg-slate-700",
-                "transition-colors duration-200"
+                "transition-colors duration-200",
               )}
               onClick={(e) => {
                 e.stopPropagation();
                 handleAddTask(date);
               }}
             >
-              <Plus className={cn(
-                "w-4 h-4",
-                "text-gray-600 dark:text-gray-400",
-                "group-hover:text-gray-900 dark:group-hover:text-white",
-                "transition-colors duration-200"
-              )} />
+              <Plus
+                className={cn(
+                  "w-4 h-4",
+                  "text-gray-600 dark:text-gray-400",
+                  "group-hover:text-gray-900 dark:group-hover:text-white",
+                  "transition-colors duration-200",
+                )}
+              />
             </div>
           </div>
         )}
         {isNewTaskDate && (
-          <div className="absolute inset-x-0 top-0 p-1">
+          <div className="absolute inset-x-0 top-6 p-1 z-10">
             <Input
               autoFocus
               value={newTask.title}
-              onChange={(e) => setNewTask(prev => ({ ...prev, title: e.target.value }))}
+              onChange={(e) =>
+                setNewTask((prev) => ({ ...prev, title: e.target.value }))
+              }
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === "Enter") {
                   handleNewTaskSave();
-                } else if (e.key === 'Escape') {
+                } else if (e.key === "Escape") {
                   setNewTask({
                     date: null,
                     isEditing: false,
-                    title: ''
+                    title: "",
                   });
                 }
               }}
@@ -296,7 +313,7 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
                 "text-gray-900 dark:text-white",
                 "placeholder:text-gray-400 dark:placeholder:text-gray-500",
                 "focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400",
-                "focus:border-transparent"
+                "focus:border-transparent",
               )}
               placeholder="Enter task title..."
             />
@@ -305,7 +322,6 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
       </div>
     );
   };
-
   return (
     <div className="flex flex-1 h-full">
       <div className="flex-1 p-6">
@@ -314,7 +330,7 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
           events={events}
           startAccessor="start"
           endAccessor="end"
-          style={{ height: 'calc(100vh - 160px)' }}
+          style={{ height: "calc(100vh - 160px)" }}
           views={[Views.MONTH, Views.WEEK, Views.DAY]}
           view={view}
           onView={setView}
@@ -330,20 +346,22 @@ export const Calendar: React.FC<CalendarProps> = ({ theme = 'light' }) => {
           draggableAccessor={() => true}
           className={cn(
             "rounded-lg border",
-            theme === 'dark' 
-              ? "border-slate-700 bg-slate-800 text-white" 
-              : "border-gray-200"
+            theme === "dark"
+              ? "border-slate-700 bg-slate-800 text-white"
+              : "border-gray-200",
           )}
         />
       </div>
 
       {selectedTask && (
-        <div className={cn(
-          "border-l",
-          theme === 'dark' 
-            ? "border-[#334155] bg-[#1E293B]" 
-            : "border-gray-200"
-        )}>
+        <div
+          className={cn(
+            "border-l",
+            theme === "dark"
+              ? "border-[#334155] bg-[#1E293B]"
+              : "border-gray-200",
+          )}
+        >
           <PropertySheet
             task={selectedTask}
             onClose={() => setSelectedTask(null)}
