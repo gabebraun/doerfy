@@ -83,7 +83,7 @@ export const FilterHeader: React.FC<FilterHeaderProps> = ({
 
   return (
     <div className={cn(
-      "h-14 min-h-[56px] px-6 flex items-center space-x-4 overflow-x-auto",
+      "h-14 min-h-[56px] px-6 flex items-center space-x-4 border-b  border-b-[#E4E7EC] dark:border-b-[#1E293B] bg-white dark:bg-[#F9FAFB] rounded-lg",
       theme === 'dark' && "bg-[#1E293B]"
     )}>
       {activeFilters.map(([key, value]) => (
