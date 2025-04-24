@@ -52,8 +52,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, []);
 
   const sidebarItems = [
-    { icon: <Home className="w-5 h-5" />, label: "Home", path: "/home" },
-    { icon: <CircleCheckBig className="w-5 h-5" />, label: "Tasks", path: "/" },
+    { icon: <Home className="w-5 h-5" />, label: "Home", path: "/" },
+    { icon: <CircleCheckBig className="w-5 h-5" />, label: "Tasks", path: "/tasks" },
     { icon: <BookOpen className="w-5 h-5" />, label: "Stories", path: "/stories" },
     { icon: <LayoutGrid className="w-5 h-5" />, label: "Content", path: "/content" },
     { icon: <StickyNote className="w-5 h-5" />, label: "Notes", path: "/notes" },

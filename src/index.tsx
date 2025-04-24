@@ -27,8 +27,8 @@ try {
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
-          <Route path="/" element={<AuthLayout><Tasks /></AuthLayout>} />
-          <Route path="/home" element={<AuthLayout><Home /></AuthLayout>} />
+          <Route path="/" element={<AuthLayout><Home /></AuthLayout>} />
+          <Route path="/tasks" element={<AuthLayout><Tasks /></AuthLayout>} />
           <Route path="/stories" element={<AuthLayout><Stories /></AuthLayout>} />
           <Route path="/content" element={<AuthLayout><Content /></AuthLayout>} />
           <Route path="/notes" element={<AuthLayout><Notes /></AuthLayout>} />
