@@ -11,11 +11,10 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { TaskColumn } from "../../components/TaskColumn";
-import { PropertySheet } from "../../components/PropertySheet";
 import { Task } from "../../types/task";
 import { TimeBox, TimeBoxStage } from "../../types/timeBox";
 import { defaultTimeBoxes } from "../../data/timeBoxes";
-import { loadTimeBoxes, saveTimeBoxes, loadTasks, saveTasks } from "../../utils/storage";
+import { loadTimeBoxes, saveTimeBoxes, saveTasks } from "../../utils/storage";
 import { updateTaskAging } from "../../utils/taskAging";
 import { updateTaskScheduling } from '../../utils/taskScheduling';
 import { TimeBoxConfig } from "../../components/TimeBoxDialog";
@@ -25,12 +24,18 @@ import { createNewTask } from '../../utils/taskUtils';
 
 interface PtbTimeBoxProps {
   theme?: Theme;
+  tasks: Task[];
+  onTaskSelect?: (taskId: string) => void;
+  selectedTaskId?: string | null;
 }
 
-export const PtbTimeBox: React.FC<PtbTimeBoxProps> = ({ theme = 'light' }) => {
-  const [tasks, setTasks] = useState<Task[]>([]);
+export const PtbTimeBox: React.FC<PtbTimeBoxProps> = ({ 
+  theme = 'light',
+  tasks,
+  onTaskSelect,
+  selectedTaskId
+}) => {
   const [timeBoxes, setTimeBoxes] = useState<TimeBox[]>([]);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [activeTimeStage, setActiveTimeStage] = useState<TimeBoxStage>('queue');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
@@ -45,40 +50,22 @@ export const PtbTimeBox: React.FC<PtbTimeBoxProps> = ({ theme = 'light' }) => {
   );
 
   useEffect(() => {
-    const initializeData = async () => {
-      try {
-        const storedTimeBoxes = loadTimeBoxes();
-        const storedTasks = await loadTasks();
-
-        setTimeBoxes(storedTimeBoxes || defaultTimeBoxes);
-        setTasks(storedTasks || []);
-      } catch (error) {
-        console.error('Error initializing data:', error);
-        setTasks([]);
-      }
-    };
-
-    initializeData();
+    const storedTimeBoxes = loadTimeBoxes();
+    setTimeBoxes(storedTimeBoxes || defaultTimeBoxes);
   }, []);
 
   useEffect(() => {
     const updateAging = () => {
-      setTasks(prevTasks => {
-        const updatedTasks = updateTaskAging(prevTasks, timeBoxes);
-        saveTasks(updatedTasks);
-        return updatedTasks;
-      });
+      const updatedTasks = updateTaskAging(tasks, timeBoxes);
+      saveTasks(updatedTasks);
     };
 
     updateAging();
     const agingInterval = setInterval(updateAging, 1000 * 60 * 60);
 
     const updateScheduling = () => {
-      setTasks(prevTasks => {
-        const updatedTasks = prevTasks.map(task => updateTaskScheduling(task));
-        saveTasks(updatedTasks);
-        return updatedTasks;
-      });
+      const updatedTasks = tasks.map(task => updateTaskScheduling(task));
+      saveTasks(updatedTasks);
     };
 
     const now = new Date();
@@ -94,37 +81,19 @@ export const PtbTimeBox: React.FC<PtbTimeBoxProps> = ({ theme = 'light' }) => {
       clearInterval(agingInterval);
       clearTimeout(midnightTimeout);
     };
-  }, [timeBoxes]);
+  }, [timeBoxes, tasks]);
 
   const handleTaskSelect = (task: Task) => {
     if (editingTaskId !== task.id) {
-      setSelectedTask(task);
+      onTaskSelect?.(task.id);
       setActiveTimeStage(task.timeStage as TimeBoxStage);
       setEditingTaskId(null);
     }
   };
 
-  const handleTaskUpdate = (updatedTask: Task) => {
-    setTasks((prevTasks) => {
-      const newTasks = prevTasks.map((task) =>
-        task.id === updatedTask.id ? updatedTask : task
-      );
-      saveTasks(newTasks);
-      return newTasks;
-    });
-    setSelectedTask(updatedTask);
-    setActiveTimeStage(updatedTask.timeStage as TimeBoxStage);
-  };
-
-  const handleTaskDelete = (taskId: string) => {
-    setTasks((prevTasks) => {
-      const newTasks = prevTasks.filter((task) => task.id !== taskId);
-      saveTasks(newTasks);
-      return newTasks;
-    });
-    if (selectedTask?.id === taskId) {
-      setSelectedTask(null);
-    }
+  const handleTaskDelete = async (taskId: string) => {
+    const newTasks = tasks.filter((task) => task.id !== taskId);
+    await saveTasks(newTasks);
   };
 
   const calculateDaysInStage = (startDate: string, endDate: string): number => {
@@ -141,8 +110,7 @@ export const PtbTimeBox: React.FC<PtbTimeBoxProps> = ({ theme = 'light' }) => {
       
       const updatedTasks = [newTask, ...tasks];
       await saveTasks(updatedTasks);
-      setTasks(updatedTasks);
-      setSelectedTask(newTask);
+      onTaskSelect?.(newTask.id);
       setActiveTimeStage(timeStage);
       return newTask;
     } catch (error) {
@@ -151,15 +119,12 @@ export const PtbTimeBox: React.FC<PtbTimeBoxProps> = ({ theme = 'light' }) => {
     }
   };
 
-  const handleTaskTitleUpdate = (taskId: string, title: string) => {
+  const handleTaskTitleUpdate = async (taskId: string, title: string) => {
     if (editingTaskId === taskId) {
-      setTasks((prevTasks) => {
-        const updatedTasks = prevTasks.map((task) =>
-          task.id === taskId ? { ...task, title: title.trim() || task.title } : task
-        );
-        saveTasks(updatedTasks);
-        return updatedTasks;
-      });
+      const updatedTasks = tasks.map((task) =>
+        task.id === taskId ? { ...task, title: title.trim() || task.title } : task
+      );
+      await saveTasks(updatedTasks);
       setEditingTaskId(null);
     } else {
       setEditingTaskId(taskId);
@@ -241,39 +206,33 @@ export const PtbTimeBox: React.FC<PtbTimeBoxProps> = ({ theme = 'light' }) => {
           timeStage: activeTask.timeStage,
           entryDate: activeTask.stageEntryDate,
           daysInStage: daysInPreviousStage,
-          userId: 'user-456'
+          userId: activeTask.assignee
         },
         {
           timeStage: overTask.timeStage,
           entryDate: now,
-          userId: 'user-456'
+          userId: activeTask.assignee
         }
       ];
 
-      setTasks((prevTasks) => {
-        const updatedTasks = prevTasks.map(task =>
-          task.id === active.id
-            ? { 
-                ...task, 
-                timeStage: overTask.timeStage,
-                stageEntryDate: now,
-                status: undefined,
-                agingStatus: 'normal',
-                history: updatedHistory
-              }
-            : task
-        );
-        saveTasks(updatedTasks);
-        return updatedTasks;
-      });
+      const updatedTasks = tasks.map(task =>
+        task.id === active.id
+          ? { 
+              ...task, 
+              timeStage: overTask.timeStage,
+              stageEntryDate: now,
+              status: undefined,
+              agingStatus: 'normal',
+              history: updatedHistory
+            }
+          : task
+      );
+      saveTasks(updatedTasks);
     } else if (active.id !== over.id) {
       const oldIndex = tasks.findIndex(t => t.id === active.id);
       const newIndex = tasks.findIndex(t => t.id === over.id);
-      setTasks((prevTasks) => {
-        const updatedTasks = arrayMove(prevTasks, oldIndex, newIndex);
-        saveTasks(updatedTasks);
-        return updatedTasks;
-      });
+      const updatedTasks = arrayMove(tasks, oldIndex, newIndex);
+      saveTasks(updatedTasks);
     }
   };
 
@@ -282,55 +241,38 @@ export const PtbTimeBox: React.FC<PtbTimeBoxProps> = ({ theme = 'light' }) => {
   };
 
   return (
-    <div className="flex flex-1 h-full">
-      <div className="flex-1 px-6 py-4 overflow-auto">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-        >
-          {timeBoxes.sort((a, b) => a.order - b.order).map((timeBox) => (
-            <TaskColumn
-              key={timeBox.id}
-              title={timeBox.name}
-              count={getTasksByStage(timeBox.id as TimeBoxStage).length}
-              tasks={getTasksByStage(timeBox.id as TimeBoxStage)}
-              badgeCount={getTasksByStage(timeBox.id as TimeBoxStage).length}
-              defaultExpanded={timeBox.id !== 'doing' && timeBox.id !== 'done'}
-              timeStage={timeBox.id as TimeBoxStage}
-              onTaskSelect={handleTaskSelect}
-              onNewTask={handleNewTask}
-              onTaskTitleUpdate={handleTaskTitleUpdate}
-              onTaskDelete={handleTaskDelete}
-              onTimeBoxEdit={handleTimeBoxEdit}
-              onTimeBoxMove={handleTimeBoxMove}
-              editingTaskId={editingTaskId}
-              isActive={activeTimeStage === timeBox.id}
-              canMoveUp={timeBox.order > 0}
-              canMoveDown={timeBox.order < timeBoxes.length - 1}
-              expireThreshold={timeBox.expireThreshold}
-            />
-          ))}
-        </DndContext>
-      </div>
-
-      {selectedTask && (
-        <div className={cn(
-          "border-l",
-          theme === 'dark' 
-            ? "border-[#334155] bg-[#1E293B]" 
-            : "border-gray-200"
-        )}>
-          <PropertySheet
-            task={selectedTask}
-            onClose={() => setSelectedTask(null)}
-            onTaskUpdate={handleTaskUpdate}
-            theme={theme}
+    <div className="px-6 py-4 overflow-auto">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+        {timeBoxes.sort((a, b) => a.order - b.order).map((timeBox) => (
+          <TaskColumn
+            key={timeBox.id}
+            title={timeBox.name}
+            count={getTasksByStage(timeBox.id as TimeBoxStage).length}
+            tasks={getTasksByStage(timeBox.id as TimeBoxStage)}
+            badgeCount={getTasksByStage(timeBox.id as TimeBoxStage).length}
+            defaultExpanded={timeBox.id !== 'doing' && timeBox.id !== 'done'}
+            timeStage={timeBox.id as TimeBoxStage}
+            onTaskSelect={handleTaskSelect}
+            onNewTask={handleNewTask}
+            onTaskTitleUpdate={handleTaskTitleUpdate}
+            onTaskDelete={handleTaskDelete}
+            onTimeBoxEdit={handleTimeBoxEdit}
+            onTimeBoxMove={handleTimeBoxMove}
+            editingTaskId={editingTaskId}
+            isActive={activeTimeStage === timeBox.id}
+            canMoveUp={timeBox.order > 0}
+            canMoveDown={timeBox.order < timeBoxes.length - 1}
+            expireThreshold={timeBox.expireThreshold}
+            selectedTaskId={selectedTaskId}
           />
-        </div>
-      )}
+        ))}
+      </DndContext>
     </div>
   );
 };

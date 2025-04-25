@@ -222,7 +222,7 @@ export const Profile: React.FC<{ theme?: Theme }> = ({ theme = 'light' }) => {
             <Input
               type="email"
               value={user?.email}
-              disabled
+              readOnly
               className={cn(
                 "w-full",
                 theme === 'dark' 

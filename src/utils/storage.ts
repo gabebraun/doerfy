@@ -1,5 +1,6 @@
 import { Task } from '../types/task';
 import { TimeBox } from '../types/timeBox';
+import { BannerConfig } from '../components/BannerManager';
 import { supabase } from './supabaseClient';
 
 const STORAGE_KEYS = {
@@ -25,13 +26,11 @@ export function loadTimeBoxes(): TimeBox[] | null {
 
 export async function saveTasks(tasks: Task[]): Promise<void> {
   try {
-    // First, get the user's ID
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       throw new Error('No authenticated user found');
     }
 
-    // Prepare tasks for upsert by mapping them to the database schema
     const tasksToUpsert = tasks.map(task => ({
       id: task.id,
       title: task.title,
@@ -57,7 +56,6 @@ export async function saveTasks(tasks: Task[]): Promise<void> {
       created_by: user.id
     }));
 
-    // Perform the upsert operation
     const { error } = await supabase
       .from('tasks')
       .upsert(tasksToUpsert, {
@@ -76,13 +74,11 @@ export async function saveTasks(tasks: Task[]): Promise<void> {
 
 export async function loadTasks(): Promise<Task[]> {
   try {
-    // First, get the user's ID
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       throw new Error('No authenticated user found');
     }
 
-    // Fetch tasks from Supabase
     const { data: tasks, error } = await supabase
       .from('tasks')
       .select('*')
@@ -97,7 +93,6 @@ export async function loadTasks(): Promise<Task[]> {
       return [];
     }
 
-    // Map the database records to our Task type
     return tasks.map(task => ({
       id: task.id,
       title: task.title,
@@ -144,6 +139,92 @@ export async function deleteTask(taskId: string): Promise<void> {
     }
   } catch (error) {
     console.error('Error deleting task from Supabase:', error);
+    throw error;
+  }
+}
+
+export async function saveBannerConfig(config: BannerConfig): Promise<void> {
+  try {
+    console.log('Saving banner config:', config);
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      throw new Error('No authenticated user found');
+    }
+
+    const { error } = await supabase
+      .from('banner_configs')
+      .upsert({
+        user_id: user.id,
+        images: config.images,
+        transition_time: config.transitionTime,
+        audio: config.audio,
+        autoplay: config.autoplay,
+        volume: config.volume,
+        quotes: config.quotes,
+        quote_rotation: config.quoteRotation,
+        quote_duration: config.quoteDuration,
+        text_style: config.textStyle,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id'
+      });
+
+    if (error) {
+      console.error('Error saving banner config:', error);
+      throw error;
+    }
+
+    console.log('Banner config saved successfully');
+  } catch (error) {
+    console.error('Error saving banner config:', error);
+    throw error;
+  }
+}
+
+export async function loadBannerConfig(): Promise<BannerConfig | null> {
+  try {
+    console.log('Loading banner config...');
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      throw new Error('No authenticated user found');
+    }
+
+    const { data: config, error } = await supabase
+      .from('banner_configs')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (error) {
+      console.error('Error loading banner config:', error);
+      throw error;
+    }
+
+    if (!config) {
+      console.log('No banner config found');
+      return null;
+    }
+
+    const bannerConfig = {
+      images: config.images || [],
+      transitionTime: config.transition_time || 5,
+      audio: config.audio || [],
+      autoplay: config.autoplay || false,
+      volume: config.volume || 50,
+      quotes: config.quotes || [],
+      quoteRotation: config.quote_rotation || false,
+      quoteDuration: config.quote_duration || 10,
+      textStyle: config.text_style || {
+        font: 'Inter',
+        size: 24,
+        color: '#FFFFFF'
+      }
+    };
+
+    console.log('Loaded banner config:', bannerConfig);
+    return bannerConfig;
+  } catch (error) {
+    console.error('Error loading banner config:', error);
     throw error;
   }
 }

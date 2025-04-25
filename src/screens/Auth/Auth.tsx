@@ -12,9 +12,23 @@ export const Auth: React.FC = () => {
   React.useEffect(() => {
     // Check if user is already authenticated
     const checkExistingSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        navigate(from, { replace: true });
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          // Clear potentially corrupted auth data
+          localStorage.removeItem('supabase.auth.token');
+          localStorage.removeItem('doerfy_tasks');
+          navigate('/auth', { replace: true });
+          return;
+        }
+        if (session) {
+          navigate(from, { replace: true });
+        }
+      } catch (error) {
+        // Handle any unexpected errors
+        localStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('doerfy_tasks');
+        navigate('/auth', { replace: true });
       }
     };
     
@@ -26,7 +40,8 @@ export const Auth: React.FC = () => {
         localStorage.removeItem('doerfy_tasks');
         navigate(from, { replace: true });
       } else if (event === 'SIGNED_OUT') {
-        // Clear localStorage when signing out
+        // Clear all auth-related data when signing out
+        localStorage.removeItem('supabase.auth.token');
         localStorage.removeItem('doerfy_tasks');
         navigate('/auth', { replace: true });
       }
@@ -89,7 +104,7 @@ export const Auth: React.FC = () => {
                 },
               },
             }}
-            providers={[]}
+            providers={['google', 'apple']}
             redirectTo={`${window.location.origin}/auth/callback`}
             localization={{
               variables: {

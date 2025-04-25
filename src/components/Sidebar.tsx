@@ -1,23 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
-import {
-  Home,
-  Filter,
-  Calendar,
-  LayoutGrid,
-  HelpCircle,
-  Settings,
-  ChevronRight,
-  ChevronLeft,
-  Bell,
-  Sun,
-  Moon,
-  List as ListIcon,
-  User,
-  BookOpen,
-  StickyNote,
-} from 'lucide-react';
+import { Home, CheckCircle as CircleCheckBig, Calendar, LayoutGrid, HelpCircle, Settings, ChevronRight, ChevronLeft, Bell, Sun, Moon, List as ListIcon, User, BookOpen, StickyNote } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Theme } from '../utils/theme';
 import { supabase } from '../utils/supabaseClient';
@@ -68,8 +52,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, []);
 
   const sidebarItems = [
-    { icon: <Home className="w-5 h-5" />, label: "Home", path: "/home" },
-    { icon: <Filter className="w-5 h-5" />, label: "Tasks", path: "/" },
+    { icon: <Home className="w-5 h-5" />, label: "Home", path: "/" },
+    { icon: <CircleCheckBig className="w-5 h-5" />, label: "Tasks", path: "/tasks" },
     { icon: <BookOpen className="w-5 h-5" />, label: "Stories", path: "/stories" },
     { icon: <LayoutGrid className="w-5 h-5" />, label: "Content", path: "/content" },
     { icon: <StickyNote className="w-5 h-5" />, label: "Notes", path: "/notes" },
@@ -138,22 +122,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={() => navigate('/profile')}
           className={cn(
-            "w-full flex items-center px-2 py-3 transition-colors duration-200",
+            "w-full flex items-center transition-colors duration-200",
             location.pathname === '/profile'
               ? "bg-[#5036b0] text-white dark:bg-[#8B5CF6]"
               : theme === 'dark'
                 ? "text-gray-300 hover:bg-[#334155]"
-                : "text-gray-600 hover:bg-gray-100"
+                : "text-gray-600 hover:bg-gray-100",
+            !isSidebarExpanded ? "justify-center h-10 w-10" : "px-4 py-2 rounded-lg",
+            "rounded-lg"
           )}
         >
           {avatarUrl ? (
             <img
               src={avatarUrl}
               alt="Profile"
-              className="w-5 h-5 rounded-full object-cover"
+              className={cn(
+                "rounded-full object-cover",
+                !isSidebarExpanded ? "w-5 h-5" : "w-6 h-6"
+              )}
             />
           ) : (
-            <User className="w-5 h-5" />
+            <User className={cn(
+              !isSidebarExpanded ? "w-5 h-5" : "w-6 h-6"
+            )} />
+          )}
+          {isSidebarExpanded && (
+            <span className="ml-3 text-sm font-medium">Profile</span>
           )}
         </button>
 

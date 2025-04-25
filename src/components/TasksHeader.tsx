@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { 
   DropdownMenu,
@@ -13,7 +13,7 @@ import {
   MoreHorizontal,
   Plus,
   SlidersHorizontal,
-  ListIcon
+  ListIcon,
 } from 'lucide-react';
 
 interface TasksHeaderProps {
@@ -25,6 +25,7 @@ interface TasksHeaderProps {
   tabs?: React.ReactNode;
   isAddListOpen?: boolean;
   setIsAddListOpen?: (open: boolean) => void;
+  onFilterClick?: () => void;
 }
 
 export const TasksHeader: React.FC<TasksHeaderProps> = ({
@@ -35,7 +36,8 @@ export const TasksHeader: React.FC<TasksHeaderProps> = ({
   theme = 'light',
   tabs,
   isAddListOpen,
-  setIsAddListOpen
+  setIsAddListOpen,
+  onFilterClick
 }) => {
   return (
     <div className={cn(
@@ -65,7 +67,12 @@ export const TasksHeader: React.FC<TasksHeaderProps> = ({
         <Button variant="ghost" size="icon" className="h-10 w-10">
           <Search className="w-5 h-5 text-gray-500 dark:text-gray-400" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-10 w-10">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-10 w-10"
+          onClick={onFilterClick}
+        >
           <SlidersHorizontal className="w-5 h-5 text-gray-500 dark:text-gray-400" />
         </Button>
         <DropdownMenu>

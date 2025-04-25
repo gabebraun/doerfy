@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Tasks } from "./screens/Tasks";
+import { Home } from "./screens/Home/Home";
 import { Profile } from "./screens/Profile/Profile";
 import { Auth } from "./screens/Auth/Auth";
 import { Content } from "./screens/Content";
@@ -26,8 +27,8 @@ try {
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
-          <Route path="/" element={<AuthLayout><Tasks /></AuthLayout>} />
-          <Route path="/home" element={<Navigate to="/" replace />} />
+          <Route path="/" element={<AuthLayout><Home /></AuthLayout>} />
+          <Route path="/tasks" element={<AuthLayout><Tasks /></AuthLayout>} />
           <Route path="/stories" element={<AuthLayout><Stories /></AuthLayout>} />
           <Route path="/content" element={<AuthLayout><Content /></AuthLayout>} />
           <Route path="/notes" element={<AuthLayout><Notes /></AuthLayout>} />

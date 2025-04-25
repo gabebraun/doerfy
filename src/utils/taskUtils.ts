@@ -1,13 +1,14 @@
 import { Task } from '../types/task';
-import { getCurrentUser } from './supabaseClient';
+import { supabase } from './supabaseClient';
 
 export async function createNewTask(list: string, title: string = ''): Promise<Task> {
   console.log('Creating new task:', { list, title });
   
   const now = new Date().toISOString();
-  const user = await getCurrentUser();
   
-  if (!user) {
+  // Get the current user
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
     throw new Error('No authenticated user found');
   }
 
@@ -20,7 +21,7 @@ export async function createNewTask(list: string, title: string = ''): Promise<T
     description: '',
     timeStage: 'queue',
     stageEntryDate: now,
-    assignee: user.id,
+    assignee: user.id, // Use the current user's ID
     list,
     priority: 'medium',
     energy: 'medium',
